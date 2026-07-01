@@ -1,0 +1,41 @@
+# Generated / private data
+*.pdf
+*.csv
+*.xlsx
+*.xls
+*.zip
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.webp
+*.tiff
+*.bmp
+
+# Output / sample / source data directories
+output/
+outputs/
+render_check/
+renders/
+samples/
+data/
+raw/
+source/
+source_pdfs/
+source_images/
+cache/
+tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
