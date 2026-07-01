@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "장문독해": {
+      "description": "Default half-half worksheet layout.",
+      "layout": {
+        "DOCUMENT_TITLE": "Reading Worksheet"
+      }
+    },
+    "논리": {
+      "description": "Profile slot for logic-oriented textbooks.",
+      "layout": {
+        "DOCUMENT_TITLE": "Logic Worksheet"
+      }
+    },
+    "단문독해": {
+      "description": "Profile slot for short-reading textbooks.",
+      "layout": {
+        "DOCUMENT_TITLE": "Short Reading Worksheet"
+      }
+    }
+  }
+}

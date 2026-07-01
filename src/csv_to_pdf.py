@@ -70,9 +70,130 @@ STEM_OPTION_GAP = 4.20
 OPTION_BLOCK_X = RIGHT_X + STEM_INDENT
 OPTION_W = RIGHT_W - STEM_INDENT
 
+DOCUMENT_TITLE = "Reading Worksheet"
+HEADER_LEFT_W = 220.0
+FOOTER_PAGE_W = 70.0
+OPTION_LINE_GAP = 2.20
+QUESTION_BLOCK_GAP = 10.30
+
+HEADER_FONT_SIZE = 10.0
+HEADER_LEADING = 12.0
+FOOTER_FONT_SIZE = 10.0
+FOOTER_LEADING = 12.0
+QRANGE_FONT_SIZE = 10.3
+QRANGE_LEADING = 12.5
+PASSAGE_FONT_SIZE = 8.95
+PASSAGE_LEADING = 12.75
+STEM_FONT_SIZE = 8.55
+STEM_LEADING = 11.50
+OPTION_FONT_SIZE = 8.0
+OPTION_LEADING = 10.75
+
 FONT_REG = "Pretendard-Regular"
 FONT_MED = "Pretendard-Medium"
 FONT_BOLD = "Pretendard-Bold"
+
+LAYOUT_FIELD_GROUPS = [
+    (
+        "Frame",
+        [
+            "DOCUMENT_TITLE",
+            "LEFT_MARGIN",
+            "RIGHT_MARGIN",
+            "HEADER_TEXT_Y",
+            "HEADER_LINE_Y",
+            "FOOTER_LINE_Y",
+            "FOOTER_TEXT_Y",
+            "CENTER_X",
+            "CENTER_LINE_TOP",
+            "HEADER_LEFT_W",
+            "FOOTER_PAGE_W",
+        ],
+    ),
+    (
+        "Passage",
+        [
+            "PASSAGE_RANGE_X",
+            "PASSAGE_RANGE_Y",
+            "PASSAGE_BOX_X",
+            "PASSAGE_BOX_TOP",
+            "PASSAGE_BOX_W",
+            "PASSAGE_BOX_MAX_H",
+            "PASSAGE_PAD_BOTTOM",
+            "PASSAGE_PAD_X",
+            "PASSAGE_PAD_TOP",
+        ],
+    ),
+    (
+        "Questions",
+        [
+            "RIGHT_X",
+            "RIGHT_TOP",
+            "STEM_W",
+            "STEM_INDENT",
+            "STEM_OPTION_GAP",
+            "OPTION_LINE_GAP",
+            "QUESTION_BLOCK_GAP",
+        ],
+    ),
+    (
+        "Typography",
+        [
+            "HEADER_FONT_SIZE",
+            "HEADER_LEADING",
+            "FOOTER_FONT_SIZE",
+            "FOOTER_LEADING",
+            "QRANGE_FONT_SIZE",
+            "QRANGE_LEADING",
+            "PASSAGE_FONT_SIZE",
+            "PASSAGE_LEADING",
+            "STEM_FONT_SIZE",
+            "STEM_LEADING",
+            "OPTION_FONT_SIZE",
+            "OPTION_LEADING",
+        ],
+    ),
+]
+LAYOUT_KEYS = tuple(key for _group, keys in LAYOUT_FIELD_GROUPS for key in keys)
+TEXT_LAYOUT_KEYS = {"DOCUMENT_TITLE"}
+
+
+def current_layout() -> Dict[str, Any]:
+    return {key: globals()[key] for key in LAYOUT_KEYS}
+
+
+DEFAULT_LAYOUT = current_layout()
+
+
+def _recompute_layout() -> None:
+    global CENTER_LINE_BOTTOM, PASSAGE_TEXT_W, RIGHT_W, OPTION_BLOCK_X, OPTION_W
+    CENTER_LINE_BOTTOM = FOOTER_LINE_Y
+    PASSAGE_TEXT_W = PASSAGE_BOX_W - PASSAGE_PAD_X * 2
+    RIGHT_W = W - RIGHT_MARGIN - RIGHT_X
+    OPTION_BLOCK_X = RIGHT_X + STEM_INDENT
+    OPTION_W = RIGHT_W - STEM_INDENT
+
+
+def apply_layout(layout: Dict[str, Any] | None) -> Dict[str, Any]:
+    if not layout:
+        return current_layout()
+    for key, value in layout.items():
+        if key not in LAYOUT_KEYS:
+            continue
+        globals()[key] = str(value) if key in TEXT_LAYOUT_KEYS else float(value)
+    _recompute_layout()
+    return current_layout()
+
+
+def _layout_from_json(path: str, profile_name: str | None = None) -> Dict[str, Any]:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if "profiles" in data:
+        profiles = data["profiles"]
+        if not profile_name:
+            profile_name = next(iter(profiles))
+        profile = profiles[profile_name]
+        return profile.get("layout", profile)
+    return data.get("layout", data)
 
 
 def _candidate_font_dirs() -> List[Path]:
@@ -161,15 +282,22 @@ def pstyle(name: str, font: str, size: float, leading: float, alignment=TA_LEFT,
 def make_styles(fonts: Tuple[str, str, str]) -> Dict[str, ParagraphStyle]:
     reg, med, bold = fonts
     return {
-        "header_left": pstyle("header_left", reg, 10.0, 12.0),
-        "header_right": pstyle("header_right", reg, 10.0, 12.0, alignment=TA_RIGHT),
-        "footer": pstyle("footer", reg, 10.0, 12.0, alignment=TA_RIGHT, textColor=colors.Color(0.86, 0.86, 0.86)),
-        "qrange": pstyle("qrange", bold, 10.3, 12.5),
-        "passage": pstyle("passage", med, 8.95, 12.75, alignment=TA_JUSTIFY, spaceAfter=0),
-        "stem": pstyle("stem", reg, 8.55, 11.50, alignment=TA_LEFT, leftIndent=STEM_INDENT, firstLineIndent=-STEM_INDENT),
+        "header_left": pstyle("header_left", reg, HEADER_FONT_SIZE, HEADER_LEADING),
+        "header_right": pstyle("header_right", reg, HEADER_FONT_SIZE, HEADER_LEADING, alignment=TA_RIGHT),
+        "footer": pstyle(
+            "footer",
+            reg,
+            FOOTER_FONT_SIZE,
+            FOOTER_LEADING,
+            alignment=TA_RIGHT,
+            textColor=colors.Color(0.86, 0.86, 0.86),
+        ),
+        "qrange": pstyle("qrange", bold, QRANGE_FONT_SIZE, QRANGE_LEADING),
+        "passage": pstyle("passage", med, PASSAGE_FONT_SIZE, PASSAGE_LEADING, alignment=TA_JUSTIFY, spaceAfter=0),
+        "stem": pstyle("stem", reg, STEM_FONT_SIZE, STEM_LEADING, alignment=TA_LEFT, leftIndent=STEM_INDENT, firstLineIndent=-STEM_INDENT),
         # Option block starts at the same guide line as wrapped stem lines.
         # Wrapped option lines align to the option text after the marker.
-        "option": pstyle("option", reg, 8.0, 10.75, alignment=TA_LEFT, leftIndent=0, firstLineIndent=0),
+        "option": pstyle("option", reg, OPTION_FONT_SIZE, OPTION_LEADING, alignment=TA_LEFT, leftIndent=0, firstLineIndent=0),
     }
 
 
@@ -247,9 +375,9 @@ def draw_static_frame(c: canvas.Canvas, chapter: str, page_no: int, styles: Dict
     c.setLineWidth(0.6)
     c.line(CENTER_X, CENTER_LINE_TOP, CENTER_X, CENTER_LINE_BOTTOM)
 
-    draw_para(c, Paragraph("Reading Worksheet", styles["header_left"]), LEFT_MARGIN, HEADER_TEXT_Y, 220)
+    draw_para(c, Paragraph(esc(DOCUMENT_TITLE), styles["header_left"]), LEFT_MARGIN, HEADER_TEXT_Y, HEADER_LEFT_W)
     draw_para(c, Paragraph(esc(chapter), styles["header_right"]), LEFT_MARGIN, HEADER_TEXT_Y, W - LEFT_MARGIN - RIGHT_MARGIN)
-    draw_para(c, Paragraph(f"page {page_no}", styles["footer"]), W - RIGHT_MARGIN - 70, FOOTER_TEXT_Y, 70)
+    draw_para(c, Paragraph(f"page {page_no}", styles["footer"]), W - RIGHT_MARGIN - FOOTER_PAGE_W, FOOTER_TEXT_Y, FOOTER_PAGE_W)
 
 
 def draw_passage(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, ParagraphStyle]) -> None:
@@ -306,8 +434,8 @@ def draw_questions(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, Para
             for lab in sorted(opts.keys()):
                 op_xml = option_xml(lab, opts[lab], underlines)
                 _, oh = para(op_xml, option_style, OPTION_W)
-                yy -= oh + 2.2
-            yy -= 10.3
+                yy -= oh + OPTION_LINE_GAP
+            yy -= QUESTION_BLOCK_GAP
         return RIGHT_TOP - yy
 
     stem_style = styles["stem"]
@@ -336,8 +464,8 @@ def draw_questions(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, Para
             op_xml = option_xml(label, opts[label], underlines)
             op, oh = para(op_xml, option_style, OPTION_W)
             draw_para(c, op, OPTION_BLOCK_X, y, OPTION_W)
-            y -= oh + 2.2
-        y -= 10.3
+            y -= oh + OPTION_LINE_GAP
+        y -= QUESTION_BLOCK_GAP
 
 
 def read_rows(csv_path: str) -> List[Dict[str, str]]:
@@ -351,21 +479,49 @@ def draw_page(c: canvas.Canvas, row: Dict[str, str], page_no: int, styles: Dict[
     draw_questions(c, row, styles)
 
 
+def generate_pdf(
+    csv_path: str,
+    out_path: str,
+    layout: Dict[str, Any] | None = None,
+    font_dir: str | None = None,
+) -> int:
+    old_font_dir = os.environ.get("PRETENDARD_DIR")
+    if font_dir:
+        os.environ["PRETENDARD_DIR"] = font_dir
+    try:
+        apply_layout(layout)
+        fonts = register_fonts()
+        styles = make_styles(fonts)
+        rows = read_rows(csv_path)
+        c = canvas.Canvas(out_path, pagesize=A4)
+        for i, row in enumerate(rows, 1):
+            draw_page(c, row, i, styles)
+            c.showPage()
+        c.save()
+        return len(rows)
+    finally:
+        if font_dir:
+            if old_font_dir is None:
+                os.environ.pop("PRETENDARD_DIR", None)
+            else:
+                os.environ["PRETENDARD_DIR"] = old_font_dir
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="CSV -> half-half worksheet PDF")
     parser.add_argument("csv", help="proofread CSV file")
     parser.add_argument("--out", default="csv_to_pdf.pdf", help="output PDF path")
+    parser.add_argument("--layout-json", help="layout or profile JSON path")
+    parser.add_argument("--profile", help="profile name inside a profile JSON")
+    parser.add_argument("--font-dir", help="directory containing Pretendard font files")
+    parser.add_argument("--title", help="override header title")
     args = parser.parse_args()
 
-    fonts = register_fonts()
-    styles = make_styles(fonts)
-    rows = read_rows(args.csv)
-    c = canvas.Canvas(args.out, pagesize=A4)
-    for i, row in enumerate(rows, 1):
-        draw_page(c, row, i, styles)
-        c.showPage()
-    c.save()
-    print(f"Wrote {len(rows)} page(s): {args.out}")
+    layout = _layout_from_json(args.layout_json, args.profile) if args.layout_json else {}
+    if args.title:
+        layout["DOCUMENT_TITLE"] = args.title
+    page_count = generate_pdf(args.csv, args.out, layout=layout, font_dir=args.font_dir)
+    print(f"Wrote {page_count} page(s): {args.out}")
     return 0
 
 
