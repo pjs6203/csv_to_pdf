@@ -1,4 +1,4 @@
-첨부한 PDF는 영어 독해 문제집 스캔본이다. 이 PDF를 내가 제공한 `csv_to_preferred_pdf.py` 프로그램에서 바로 사용할 수 있는 CSV로 변환해라.
+첨부한 PDF는 영어 독해 문제집 스캔본이다. 이 PDF를 내가 제공한 `csv_to_pdf.py` 프로그램에서 바로 사용할 수 있는 CSV로 변환해라.
 
 중요:
 이 CSV는 일반적인 “문항별 1행” 구조가 아니다.
@@ -126,7 +126,7 @@ qrange,chapter,source_pages,passage,questions_json,underlines_json,notes
 
 - 마크다운 표로 출력하지 마라.
 - 설명문을 CSV 안에 섞지 마라.
-- 최종 CSV는 `csv_to_preferred_pdf.py`와 `validate_csv.py`에서 바로 사용할 수 있어야 한다.
+- 최종 CSV는 `csv_to_pdf.py`와 `validate_csv.py`에서 바로 사용할 수 있어야 한다.
 
 먼저 전체 PDF를 한 번에 변환하지 말고, 001-013번까지만 샘플 CSV로 만들어라.
 내가 승인하면 같은 규칙으로 전체 PDF를 끝까지 변환해라.

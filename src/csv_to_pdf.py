@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a half-half relayout PDF from a proofread CSV, matching the user's
-preferred 장문독해401 layout. v5: option wrapped lines align at the option guide line, before (A).
+Generate a half-half worksheet PDF from a proofread CSV.
 
 Input CSV columns:
   qrange, chapter, source_pages, passage, questions_json, underlines_json, notes
@@ -38,7 +37,7 @@ from reportlab.platypus import Paragraph
 W, H = A4
 
 # ---------------------------------------------------------------------------
-# Layout constants reverse-measured from preferred sample PDF.
+# Layout constants reverse-measured from the reference PDF layout.
 # Coordinate system here is ReportLab bottom-left.
 # ---------------------------------------------------------------------------
 LEFT_MARGIN = 38.27
@@ -248,7 +247,7 @@ def draw_static_frame(c: canvas.Canvas, chapter: str, page_no: int, styles: Dict
     c.setLineWidth(0.6)
     c.line(CENTER_X, CENTER_LINE_TOP, CENTER_X, CENTER_LINE_BOTTOM)
 
-    draw_para(c, Paragraph("장문독해 401 재조판 문제지", styles["header_left"]), LEFT_MARGIN, HEADER_TEXT_Y, 220)
+    draw_para(c, Paragraph("Reading Worksheet", styles["header_left"]), LEFT_MARGIN, HEADER_TEXT_Y, 220)
     draw_para(c, Paragraph(esc(chapter), styles["header_right"]), LEFT_MARGIN, HEADER_TEXT_Y, W - LEFT_MARGIN - RIGHT_MARGIN)
     draw_para(c, Paragraph(f"page {page_no}", styles["footer"]), W - RIGHT_MARGIN - 70, FOOTER_TEXT_Y, 70)
 
@@ -353,9 +352,9 @@ def draw_page(c: canvas.Canvas, row: Dict[str, str], page_no: int, styles: Dict[
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="CSV -> preferred 장문독해401 half-half PDF")
+    parser = argparse.ArgumentParser(description="CSV -> half-half worksheet PDF")
     parser.add_argument("csv", help="proofread CSV file")
-    parser.add_argument("--out", default="preferred_relayout.pdf", help="output PDF path")
+    parser.add_argument("--out", default="csv_to_pdf.pdf", help="output PDF path")
     args = parser.parse_args()
 
     fonts = register_fonts()
