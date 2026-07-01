@@ -7,36 +7,42 @@
       }
     },
     "논리": {
-      "description": "Short sentence-completion profile with slightly tighter vertical rhythm.",
+      "description": "Short sentence-completion profile. Uses both page columns and places questions below each passage.",
       "layout": {
         "DOCUMENT_TITLE": "Logic Worksheet",
+        "CONTENT_FLOW": "stacked_columns",
         "PASSAGE_FONT_SIZE": 9.6,
         "PASSAGE_LEADING": 13.5,
         "PASSAGE_PAD_TOP": 13.0,
         "PASSAGE_PAD_BOTTOM": 16.0,
+        "PASSAGE_QUESTION_GAP": 6.0,
         "STEM_FONT_SIZE": 8.8,
         "STEM_LEADING": 11.8,
         "OPTION_FONT_SIZE": 8.2,
         "OPTION_LEADING": 10.9,
         "STEM_OPTION_GAP": 4.6,
         "OPTION_LINE_GAP": 2.0,
-        "QUESTION_BLOCK_GAP": 9.0
+        "QUESTION_BLOCK_GAP": 9.0,
+        "STACKED_ITEM_GAP": 14.0
       }
     },
     "단문독해": {
-      "description": "Short-reading profile. Slightly larger passage text for compact one-question passages.",
+      "description": "Short-reading profile. Uses both page columns and places questions below each passage.",
       "layout": {
         "DOCUMENT_TITLE": "Short Reading Worksheet",
+        "CONTENT_FLOW": "stacked_columns",
         "PASSAGE_FONT_SIZE": 9.35,
         "PASSAGE_LEADING": 13.25,
         "PASSAGE_PAD_TOP": 12.0,
         "PASSAGE_PAD_BOTTOM": 16.0,
+        "PASSAGE_QUESTION_GAP": 6.5,
         "STEM_FONT_SIZE": 8.65,
         "STEM_LEADING": 11.7,
         "OPTION_FONT_SIZE": 8.05,
         "OPTION_LEADING": 10.85,
         "STEM_OPTION_GAP": 4.6,
-        "QUESTION_BLOCK_GAP": 10.0
+        "QUESTION_BLOCK_GAP": 10.0,
+        "STACKED_ITEM_GAP": 15.0
       }
     }
   }

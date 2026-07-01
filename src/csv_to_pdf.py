@@ -69,6 +69,9 @@ STEM_INDENT = 23.00
 STEM_OPTION_GAP = 4.20
 OPTION_BLOCK_X = RIGHT_X + STEM_INDENT
 OPTION_W = RIGHT_W - STEM_INDENT
+CONTENT_FLOW = "side_by_side"
+PASSAGE_QUESTION_GAP = 7.00
+STACKED_ITEM_GAP = 17.00
 
 DOCUMENT_TITLE = "Reading Worksheet"
 HEADER_LEFT_W = 220.0
@@ -127,13 +130,16 @@ LAYOUT_FIELD_GROUPS = [
     (
         "Questions",
         [
+            "CONTENT_FLOW",
             "RIGHT_X",
             "RIGHT_TOP",
             "STEM_W",
             "STEM_INDENT",
+            "PASSAGE_QUESTION_GAP",
             "STEM_OPTION_GAP",
             "OPTION_LINE_GAP",
             "QUESTION_BLOCK_GAP",
+            "STACKED_ITEM_GAP",
         ],
     ),
     (
@@ -155,7 +161,7 @@ LAYOUT_FIELD_GROUPS = [
     ),
 ]
 LAYOUT_KEYS = tuple(key for _group, keys in LAYOUT_FIELD_GROUPS for key in keys)
-TEXT_LAYOUT_KEYS = {"DOCUMENT_TITLE"}
+TEXT_LAYOUT_KEYS = {"DOCUMENT_TITLE", "CONTENT_FLOW"}
 
 
 def current_layout() -> Dict[str, Any]:
@@ -320,6 +326,10 @@ def display_qrange(value: str) -> str:
     return f"{start}~{end}"
 
 
+def normalized_content_flow() -> str:
+    return str(CONTENT_FLOW).strip().lower().replace("-", "_")
+
+
 def phrase_underline_xml(text: str, phrases: List[str]) -> str:
     out = esc(text)
     for phrase in sorted((p for p in phrases if p), key=len, reverse=True):
@@ -372,6 +382,98 @@ def option_xml(label: str, text: Any, underlines: List[str]) -> str:
     return marker + phrase_underline_xml(text, underlines)
 
 
+def row_underlines(row: Dict[str, str]) -> List[str]:
+    try:
+        underlines = json.loads(row.get("underlines_json") or "[]")
+        if isinstance(underlines, list):
+            return underlines
+    except Exception:
+        pass
+    return []
+
+
+def row_questions(row: Dict[str, str]) -> List[Dict[str, Any]]:
+    try:
+        questions = json.loads(row.get("questions_json") or "[]")
+        if isinstance(questions, list):
+            return [q for q in questions if isinstance(q, dict)]
+    except Exception:
+        pass
+    return []
+
+
+def normalized_options(q: Dict[str, Any]) -> Dict[str, Any]:
+    opts = q.get("options") or {}
+    if isinstance(opts, list):
+        return {chr(ord("A") + i): v for i, v in enumerate(opts)}
+    if isinstance(opts, dict):
+        return opts
+    return {}
+
+
+def question_stem_xml(q: Dict[str, Any], underlines: List[str]) -> str:
+    num = str(q.get("num", "")).zfill(3)
+    return f'<font name="{FONT_BOLD}">{num}.</font> ' + phrase_underline_xml(q.get("stem", ""), underlines)
+
+
+def question_block_height(
+    questions: List[Dict[str, Any]],
+    underlines: List[str],
+    stem_style: ParagraphStyle,
+    option_style: ParagraphStyle,
+    stem_w: float,
+    option_w: float,
+) -> float:
+    total = 0.0
+    for q in questions:
+        _, stem_h = para(question_stem_xml(q, underlines), stem_style, stem_w)
+        total += stem_h + STEM_OPTION_GAP
+        for lab in sorted(normalized_options(q).keys()):
+            _, oh = para(option_xml(lab, normalized_options(q)[lab], underlines), option_style, option_w)
+            total += oh + OPTION_LINE_GAP
+        total += QUESTION_BLOCK_GAP
+    return total
+
+
+def draw_question_block(
+    c: canvas.Canvas,
+    questions: List[Dict[str, Any]],
+    underlines: List[str],
+    styles: Dict[str, ParagraphStyle],
+    x: float,
+    y_top: float,
+    stem_w: float,
+    option_x: float,
+    option_w: float,
+    max_y_bottom: float,
+) -> float:
+    y = y_top
+    stem_style = styles["stem"]
+    option_style = make_option_style(styles["option"])
+    available = y_top - max_y_bottom
+    total_h = question_block_height(questions, underlines, stem_style, option_style, stem_w, option_w)
+    if total_h > available:
+        scale = max(0.82, available / max(total_h, 1))
+        stem_size = max(7.1, stem_style.fontSize * scale)
+        opt_size = max(6.8, option_style.fontSize * scale)
+        stem_style = ParagraphStyle("stem_fit", parent=stem_style, fontSize=stem_size, leading=stem_size * 1.345)
+        base_option = ParagraphStyle("option_fit_base", parent=styles["option"], fontSize=opt_size, leading=opt_size * 1.34)
+        option_style = make_option_style(base_option)
+
+    for q in questions:
+        p, h = para(question_stem_xml(q, underlines), stem_style, stem_w)
+        draw_para(c, p, x, y, stem_w)
+        y -= h + STEM_OPTION_GAP
+
+        for label in sorted(normalized_options(q).keys()):
+            op_xml = option_xml(label, normalized_options(q)[label], underlines)
+            op, oh = para(op_xml, option_style, option_w)
+            draw_para(c, op, option_x, y, option_w)
+            y -= oh + OPTION_LINE_GAP
+        y -= QUESTION_BLOCK_GAP
+    return y
+
+
 def draw_static_frame(c: canvas.Canvas, chapter: str, page_no: int, styles: Dict[str, ParagraphStyle]) -> None:
     c.setStrokeColor(colors.Color(0.33, 0.33, 0.33))
     c.setLineWidth(1.0)
@@ -390,92 +492,116 @@ def draw_static_frame(c: canvas.Canvas, chapter: str, page_no: int, styles: Dict
     draw_para(c, Paragraph(f"page {page_no}", styles["footer"]), W - RIGHT_MARGIN - FOOTER_PAGE_W, FOOTER_TEXT_Y, FOOTER_PAGE_W)
 
 
-def draw_passage(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, ParagraphStyle]) -> None:
-    qrange = display_qrange(row.get("qrange") or "")
-    draw_para(c, Paragraph(esc(qrange), styles["qrange"]), PASSAGE_RANGE_X, PASSAGE_RANGE_Y, PASSAGE_BOX_W)
-
-    try:
-        underlines = json.loads(row.get("underlines_json") or "[]")
-        if not isinstance(underlines, list):
-            underlines = []
-    except Exception:
-        underlines = []
+def passage_paragraph(
+    row: Dict[str, str],
+    styles: Dict[str, ParagraphStyle],
+    box_w: float,
+    max_box_h: float | None = None,
+) -> Tuple[Paragraph, float, float, float]:
+    max_box_h = PASSAGE_BOX_MAX_H if max_box_h is None else max_box_h
+    underlines = row_underlines(row)
     passage_xml = phrase_underline_xml(row.get("passage") or "", underlines)
     p, style, h = fit_paragraph_xml(
         passage_xml,
         styles["passage"],
-        PASSAGE_TEXT_W,
-        PASSAGE_BOX_MAX_H - PASSAGE_PAD_TOP - PASSAGE_PAD_BOTTOM,
+        box_w - PASSAGE_PAD_X * 2,
+        max_box_h - PASSAGE_PAD_TOP - PASSAGE_PAD_BOTTOM,
     )
-    box_h = min(PASSAGE_BOX_MAX_H, h + PASSAGE_PAD_TOP + PASSAGE_PAD_BOTTOM)
+    box_h = min(max_box_h, h + PASSAGE_PAD_TOP + PASSAGE_PAD_BOTTOM)
+    return p, style, h, box_h
+
+
+def draw_passage_at(
+    c: canvas.Canvas,
+    row: Dict[str, str],
+    styles: Dict[str, ParagraphStyle],
+    box_x: float,
+    range_y: float,
+    box_top: float,
+    box_w: float,
+) -> float:
+    qrange = display_qrange(row.get("qrange") or "")
+    draw_para(c, Paragraph(esc(qrange), styles["qrange"]), box_x, range_y, box_w)
+
+    p, _style, h, box_h = passage_paragraph(row, styles, box_w)
     c.setFillColor(colors.Color(0.917647, 0.917647, 0.917647))
-    c.rect(PASSAGE_BOX_X, PASSAGE_BOX_TOP - box_h, PASSAGE_BOX_W, box_h, stroke=0, fill=1)
+    c.rect(box_x, box_top - box_h, box_w, box_h, stroke=0, fill=1)
     c.setFillColor(colors.black)
-    p.drawOn(c, PASSAGE_BOX_X + PASSAGE_PAD_X, PASSAGE_BOX_TOP - PASSAGE_PAD_TOP - h)
+    p.drawOn(c, box_x + PASSAGE_PAD_X, box_top - PASSAGE_PAD_TOP - h)
+    return box_top - box_h
+
+
+def draw_passage(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, ParagraphStyle]) -> None:
+    draw_passage_at(c, row, styles, PASSAGE_BOX_X, PASSAGE_RANGE_Y, PASSAGE_BOX_TOP, PASSAGE_BOX_W)
 
 
 def draw_questions(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, ParagraphStyle]) -> None:
-    try:
-        questions = json.loads(row.get("questions_json") or "[]")
-        if not isinstance(questions, list):
-            questions = []
-    except Exception:
-        questions = []
-    try:
-        underlines = json.loads(row.get("underlines_json") or "[]")
-        if not isinstance(underlines, list):
-            underlines = []
-    except Exception:
-        underlines = []
+    draw_question_block(
+        c,
+        row_questions(row),
+        row_underlines(row),
+        styles,
+        RIGHT_X,
+        RIGHT_TOP,
+        STEM_W,
+        OPTION_BLOCK_X,
+        OPTION_W,
+        FOOTER_LINE_Y + 10.0,
+    )
 
-    y = RIGHT_TOP
-    max_y_bottom = FOOTER_LINE_Y + 10.0
 
-    def layout_height(stem_style, option_style) -> float:
-        yy = RIGHT_TOP
-        for q in questions:
-            num = str(q.get("num", "")).zfill(3)
-            stem_text = f'<font name="{FONT_BOLD}">{num}.</font> ' + phrase_underline_xml(q.get("stem", ""), underlines)
-            _, stem_h = para(stem_text, stem_style, STEM_W)
-            yy -= stem_h + STEM_OPTION_GAP
-            opts = q.get("options") or {}
-            if isinstance(opts, list):
-                opts = {chr(ord("A") + i): v for i, v in enumerate(opts)}
-            for lab in sorted(opts.keys()):
-                op_xml = option_xml(lab, opts[lab], underlines)
-                _, oh = para(op_xml, option_style, OPTION_W)
-                yy -= oh + OPTION_LINE_GAP
-            yy -= QUESTION_BLOCK_GAP
-        return RIGHT_TOP - yy
+def stacked_column_geometry(column: int) -> Tuple[float, float]:
+    if column == 0:
+        return PASSAGE_BOX_X, PASSAGE_BOX_W
+    return RIGHT_X, RIGHT_W
 
-    stem_style = styles["stem"]
-    option_style = make_option_style(styles["option"])
-    available = RIGHT_TOP - max_y_bottom
-    total_h = layout_height(stem_style, option_style)
-    if total_h > available:
-        scale = max(0.82, available / max(total_h, 1))
-        stem_size = max(7.1, stem_style.fontSize * scale)
-        opt_size = max(6.8, option_style.fontSize * scale)
-        stem_style = ParagraphStyle("stem_fit", parent=stem_style, fontSize=stem_size, leading=stem_size * 1.345)
-        base_option = ParagraphStyle("option_fit_base", parent=styles["option"], fontSize=opt_size, leading=opt_size * 1.34)
-        option_style = make_option_style(base_option)
 
-    for q in questions:
-        num = str(q.get("num", "")).zfill(3)
-        stem_xml = f'<font name="{FONT_BOLD}">{num}.</font> ' + phrase_underline_xml(q.get("stem", ""), underlines)
-        p, h = para(stem_xml, stem_style, STEM_W)
-        draw_para(c, p, RIGHT_X, y, STEM_W)
-        y -= h + STEM_OPTION_GAP
+def stacked_item_height(row: Dict[str, str], styles: Dict[str, ParagraphStyle], box_w: float) -> float:
+    _p, _style, _text_h, box_h = passage_paragraph(row, styles, box_w)
+    questions = row_questions(row)
+    question_h = 0.0
+    if questions:
+        option_style = make_option_style(styles["option"])
+        question_h = question_block_height(
+            questions,
+            row_underlines(row),
+            styles["stem"],
+            option_style,
+            box_w,
+            box_w - STEM_INDENT,
+        )
+    range_to_box = PASSAGE_RANGE_Y - PASSAGE_BOX_TOP
+    question_gap = PASSAGE_QUESTION_GAP if questions else 0.0
+    return range_to_box + box_h + question_gap + question_h + STACKED_ITEM_GAP
 
-        opts = q.get("options") or {}
-        if isinstance(opts, list):
-            opts = {chr(ord("A") + i): v for i, v in enumerate(opts)}
-        for label in sorted(opts.keys()):
-            op_xml = option_xml(label, opts[label], underlines)
-            op, oh = para(op_xml, option_style, OPTION_W)
-            draw_para(c, op, OPTION_BLOCK_X, y, OPTION_W)
-            y -= oh + OPTION_LINE_GAP
-        y -= QUESTION_BLOCK_GAP
+
+def draw_stacked_item(
+    c: canvas.Canvas,
+    row: Dict[str, str],
+    styles: Dict[str, ParagraphStyle],
+    column: int,
+    range_y: float,
+) -> float:
+    box_x, box_w = stacked_column_geometry(column)
+    box_top = range_y - (PASSAGE_RANGE_Y - PASSAGE_BOX_TOP)
+    passage_bottom = draw_passage_at(c, row, styles, box_x, range_y, box_top, box_w)
+    questions = row_questions(row)
+    bottom = passage_bottom
+    if questions:
+        question_top = passage_bottom - PASSAGE_QUESTION_GAP
+        bottom = draw_question_block(
+            c,
+            questions,
+            row_underlines(row),
+            styles,
+            box_x,
+            question_top,
+            box_w,
+            box_x + STEM_INDENT,
+            box_w - STEM_INDENT,
+            FOOTER_LINE_Y + 10.0,
+        )
+    return bottom - STACKED_ITEM_GAP
 
 
 def read_rows(csv_path: str) -> List[Dict[str, str]]:
@@ -487,6 +613,42 @@ def draw_page(c: canvas.Canvas, row: Dict[str, str], page_no: int, styles: Dict[
     draw_static_frame(c, row.get("chapter") or "", page_no, styles)
     draw_passage(c, row, styles)
     draw_questions(c, row, styles)
+
+
+def draw_stacked_pages(c: canvas.Canvas, rows: List[Dict[str, str]], styles: Dict[str, ParagraphStyle]) -> int:
+    page_no = 1
+    index = 0
+    bottom_y = FOOTER_LINE_Y + 10.0
+
+    while index < len(rows):
+        chapter = rows[index].get("chapter") or ""
+        draw_static_frame(c, chapter, page_no, styles)
+        column = 0
+        y_by_column = [PASSAGE_RANGE_Y, PASSAGE_RANGE_Y]
+        placed = 0
+
+        while index < len(rows):
+            row = rows[index]
+            if placed and (row.get("chapter") or "") != chapter:
+                break
+
+            box_x, box_w = stacked_column_geometry(column)
+            item_h = stacked_item_height(row, styles, box_w)
+            if y_by_column[column] - item_h < bottom_y:
+                if column == 0:
+                    column = 1
+                    continue
+                if placed:
+                    break
+
+            y_by_column[column] = draw_stacked_item(c, row, styles, column, y_by_column[column])
+            index += 1
+            placed += 1
+
+        c.showPage()
+        page_no += 1
+
+    return page_no - 1
 
 
 def generate_pdf(
@@ -504,11 +666,15 @@ def generate_pdf(
         styles = make_styles(fonts)
         rows = read_rows(csv_path)
         c = canvas.Canvas(out_path, pagesize=A4)
-        for i, row in enumerate(rows, 1):
-            draw_page(c, row, i, styles)
-            c.showPage()
+        if normalized_content_flow() == "stacked_columns":
+            page_count = draw_stacked_pages(c, rows, styles)
+        else:
+            for i, row in enumerate(rows, 1):
+                draw_page(c, row, i, styles)
+                c.showPage()
+            page_count = len(rows)
         c.save()
-        return len(rows)
+        return page_count
     finally:
         if font_dir:
             if old_font_dir is None:
