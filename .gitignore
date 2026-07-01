@@ -4,6 +4,10 @@
 *.xlsx
 *.xls
 *.zip
+*.ttf
+*.otf
+*.woff
+*.woff2
 *.png
 *.jpg
 *.jpeg
@@ -23,6 +27,7 @@ raw/
 source/
 source_pdfs/
 source_images/
+fonts/
 cache/
 tmp/
 

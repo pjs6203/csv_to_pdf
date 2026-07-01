@@ -66,7 +66,10 @@ RIGHT_X = 317.81
 RIGHT_TOP = H - 83.00
 RIGHT_W = W - RIGHT_MARGIN - RIGHT_X
 STEM_W = 220.70
-OPTION_W = RIGHT_W
+STEM_INDENT = 23.00
+STEM_OPTION_GAP = 4.20
+OPTION_BLOCK_X = RIGHT_X + STEM_INDENT
+OPTION_W = RIGHT_W - STEM_INDENT
 
 FONT_REG = "Pretendard-Regular"
 FONT_MED = "Pretendard-Medium"
@@ -164,9 +167,9 @@ def make_styles(fonts: Tuple[str, str, str]) -> Dict[str, ParagraphStyle]:
         "footer": pstyle("footer", reg, 10.0, 12.0, alignment=TA_RIGHT, textColor=colors.Color(0.86, 0.86, 0.86)),
         "qrange": pstyle("qrange", bold, 10.3, 12.5),
         "passage": pstyle("passage", med, 8.95, 12.75, alignment=TA_JUSTIFY, spaceAfter=0),
-        "stem": pstyle("stem", reg, 8.55, 11.50, alignment=TA_LEFT, leftIndent=20.00, firstLineIndent=-20.00),
-        # Options start at the option guide line itself: wrapped lines align with the (A) marker.
-        # User notation: indent at "$ (A) text", not at "(A) * text".
+        "stem": pstyle("stem", reg, 8.55, 11.50, alignment=TA_LEFT, leftIndent=STEM_INDENT, firstLineIndent=-STEM_INDENT),
+        # Option block starts at the same guide line as wrapped stem lines.
+        # Wrapped option lines align to the option text after the marker.
         "option": pstyle("option", reg, 8.0, 10.75, alignment=TA_LEFT, leftIndent=0, firstLineIndent=0),
     }
 
@@ -212,6 +215,24 @@ def fit_paragraph_xml(text_xml: str, base_style: ParagraphStyle, width: float, m
         style = ParagraphStyle(style.name + "_fit", parent=base_style, fontSize=size, leading=size * leading_ratio)
         p, h = para(text_xml, style, width)
     return p, style, h
+
+
+def make_option_style(base_style: ParagraphStyle) -> ParagraphStyle:
+    marker_w = (
+        pdfmetrics.stringWidth("(A)", FONT_MED, base_style.fontSize)
+        + pdfmetrics.stringWidth(" ", base_style.fontName, base_style.fontSize)
+    )
+    return ParagraphStyle(
+        base_style.name + "_opt",
+        parent=base_style,
+        leftIndent=marker_w,
+        firstLineIndent=-marker_w,
+    )
+
+
+def option_xml(label: str, text: Any, underlines: List[str]) -> str:
+    marker = f'<font name="{FONT_MED}">({esc(label)})</font> '
+    return marker + phrase_underline_xml(text, underlines)
 
 
 def draw_static_frame(c: canvas.Canvas, chapter: str, page_no: int, styles: Dict[str, ParagraphStyle]) -> None:
@@ -279,19 +300,19 @@ def draw_questions(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, Para
             num = str(q.get("num", "")).zfill(3)
             stem_text = f'<font name="{FONT_BOLD}">{num}.</font> ' + phrase_underline_xml(q.get("stem", ""), underlines)
             _, stem_h = para(stem_text, stem_style, STEM_W)
-            yy -= stem_h + 2.3
+            yy -= stem_h + STEM_OPTION_GAP
             opts = q.get("options") or {}
             if isinstance(opts, list):
                 opts = {chr(ord("A") + i): v for i, v in enumerate(opts)}
             for lab in sorted(opts.keys()):
-                op_xml = f'<font name="{FONT_MED}">({lab})</font> ' + phrase_underline_xml(str(opts[lab]), underlines)
+                op_xml = option_xml(lab, opts[lab], underlines)
                 _, oh = para(op_xml, option_style, OPTION_W)
                 yy -= oh + 2.2
             yy -= 10.3
         return RIGHT_TOP - yy
 
     stem_style = styles["stem"]
-    option_style = styles["option"]
+    option_style = make_option_style(styles["option"])
     available = RIGHT_TOP - max_y_bottom
     total_h = layout_height(stem_style, option_style)
     if total_h > available:
@@ -299,23 +320,23 @@ def draw_questions(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, Para
         stem_size = max(7.1, stem_style.fontSize * scale)
         opt_size = max(6.8, option_style.fontSize * scale)
         stem_style = ParagraphStyle("stem_fit", parent=stem_style, fontSize=stem_size, leading=stem_size * 1.345)
-        option_style = ParagraphStyle("option_fit", parent=option_style, fontSize=opt_size, leading=opt_size * 1.34,
-                                      leftIndent=0, firstLineIndent=0)
+        base_option = ParagraphStyle("option_fit_base", parent=styles["option"], fontSize=opt_size, leading=opt_size * 1.34)
+        option_style = make_option_style(base_option)
 
     for q in questions:
         num = str(q.get("num", "")).zfill(3)
         stem_xml = f'<font name="{FONT_BOLD}">{num}.</font> ' + phrase_underline_xml(q.get("stem", ""), underlines)
         p, h = para(stem_xml, stem_style, STEM_W)
         draw_para(c, p, RIGHT_X, y, STEM_W)
-        y -= h + 2.3
+        y -= h + STEM_OPTION_GAP
 
         opts = q.get("options") or {}
         if isinstance(opts, list):
             opts = {chr(ord("A") + i): v for i, v in enumerate(opts)}
         for label in sorted(opts.keys()):
-            op_xml = f'<font name="{FONT_MED}">({label})</font> ' + phrase_underline_xml(str(opts[label]), underlines)
+            op_xml = option_xml(label, opts[label], underlines)
             op, oh = para(op_xml, option_style, OPTION_W)
-            draw_para(c, op, RIGHT_X, y, OPTION_W)
+            draw_para(c, op, OPTION_BLOCK_X, y, OPTION_W)
             y -= oh + 2.2
         y -= 10.3
 
