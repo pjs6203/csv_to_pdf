@@ -1,21 +1,42 @@
 {
   "profiles": {
     "장문독해": {
-      "description": "Default half-half worksheet layout.",
+      "description": "Long-passage profile. Keeps the base half-half worksheet layout.",
       "layout": {
         "DOCUMENT_TITLE": "Reading Worksheet"
       }
     },
     "논리": {
-      "description": "Profile slot for logic-oriented textbooks.",
+      "description": "Short sentence-completion profile with slightly tighter vertical rhythm.",
       "layout": {
-        "DOCUMENT_TITLE": "Logic Worksheet"
+        "DOCUMENT_TITLE": "Logic Worksheet",
+        "PASSAGE_FONT_SIZE": 9.6,
+        "PASSAGE_LEADING": 13.5,
+        "PASSAGE_PAD_TOP": 13.0,
+        "PASSAGE_PAD_BOTTOM": 16.0,
+        "STEM_FONT_SIZE": 8.8,
+        "STEM_LEADING": 11.8,
+        "OPTION_FONT_SIZE": 8.2,
+        "OPTION_LEADING": 10.9,
+        "STEM_OPTION_GAP": 4.6,
+        "OPTION_LINE_GAP": 2.0,
+        "QUESTION_BLOCK_GAP": 9.0
       }
     },
     "단문독해": {
-      "description": "Profile slot for short-reading textbooks.",
+      "description": "Short-reading profile. Slightly larger passage text for compact one-question passages.",
       "layout": {
-        "DOCUMENT_TITLE": "Short Reading Worksheet"
+        "DOCUMENT_TITLE": "Short Reading Worksheet",
+        "PASSAGE_FONT_SIZE": 9.35,
+        "PASSAGE_LEADING": 13.25,
+        "PASSAGE_PAD_TOP": 12.0,
+        "PASSAGE_PAD_BOTTOM": 16.0,
+        "STEM_FONT_SIZE": 8.65,
+        "STEM_LEADING": 11.7,
+        "OPTION_FONT_SIZE": 8.05,
+        "OPTION_LEADING": 10.85,
+        "STEM_OPTION_GAP": 4.6,
+        "QUESTION_BLOCK_GAP": 10.0
       }
     }
   }

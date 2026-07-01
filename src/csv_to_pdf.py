@@ -310,6 +310,16 @@ def esc(s: Any) -> str:
     return s
 
 
+def display_qrange(value: str) -> str:
+    normalized = (value or "").strip().replace("~", "-")
+    if "-" not in normalized:
+        return normalized
+    start, end = normalized.split("-", 1)
+    if start == end:
+        return start
+    return f"{start}~{end}"
+
+
 def phrase_underline_xml(text: str, phrases: List[str]) -> str:
     out = esc(text)
     for phrase in sorted((p for p in phrases if p), key=len, reverse=True):
@@ -381,7 +391,7 @@ def draw_static_frame(c: canvas.Canvas, chapter: str, page_no: int, styles: Dict
 
 
 def draw_passage(c: canvas.Canvas, row: Dict[str, str], styles: Dict[str, ParagraphStyle]) -> None:
-    qrange = (row.get("qrange") or "").replace("-", "~")
+    qrange = display_qrange(row.get("qrange") or "")
     draw_para(c, Paragraph(esc(qrange), styles["qrange"]), PASSAGE_RANGE_X, PASSAGE_RANGE_Y, PASSAGE_BOX_W)
 
     try:
