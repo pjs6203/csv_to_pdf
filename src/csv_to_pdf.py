@@ -615,12 +615,17 @@ def draw_page(c: canvas.Canvas, row: Dict[str, str], page_no: int, styles: Dict[
     draw_questions(c, row, styles)
 
 
-def draw_stacked_pages(c: canvas.Canvas, rows: List[Dict[str, str]], styles: Dict[str, ParagraphStyle]) -> int:
+def draw_stacked_pages(
+    c: canvas.Canvas,
+    rows: List[Dict[str, str]],
+    styles: Dict[str, ParagraphStyle],
+    page_limit: int | None = None,
+) -> int:
     page_no = 1
     index = 0
     bottom_y = FOOTER_LINE_Y + 10.0
 
-    while index < len(rows):
+    while index < len(rows) and (page_limit is None or page_no <= page_limit):
         chapter = rows[index].get("chapter") or ""
         draw_static_frame(c, chapter, page_no, styles)
         column = 0
@@ -656,6 +661,7 @@ def generate_pdf(
     out_path: str,
     layout: Dict[str, Any] | None = None,
     font_dir: str | None = None,
+    page_limit: int | None = None,
 ) -> int:
     old_font_dir = os.environ.get("PRETENDARD_DIR")
     if font_dir:
@@ -667,12 +673,13 @@ def generate_pdf(
         rows = read_rows(csv_path)
         c = canvas.Canvas(out_path, pagesize=A4)
         if normalized_content_flow() == "stacked_columns":
-            page_count = draw_stacked_pages(c, rows, styles)
+            page_count = draw_stacked_pages(c, rows, styles, page_limit=page_limit)
         else:
-            for i, row in enumerate(rows, 1):
+            rows_to_draw = rows[:page_limit] if page_limit is not None else rows
+            for i, row in enumerate(rows_to_draw, 1):
                 draw_page(c, row, i, styles)
                 c.showPage()
-            page_count = len(rows)
+            page_count = len(rows_to_draw)
         c.save()
         return page_count
     finally:
