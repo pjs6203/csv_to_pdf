@@ -5,6 +5,13 @@
 논리 문제는 보통 한 번호에 하나의 짧은 지문, 문장, 빈칸, 또는 논리 관계 문제가 붙어 있으므로 대부분 `001-001`, `002-002`처럼 한 문항짜리 qrange가 된다.
 만약 하나의 지문이나 조건에 여러 문항이 붙어 있으면 한 행만 만들고, 모든 문항을 `questions_json` 컬럼 안에 JSON 배열로 넣어라.
 
+OCR 사용 원칙:
+- OCR은 정확도가 낮을 수 있으므로 주된 추출 수단으로 사용하지 마라.
+- 가능한 한 원본 PDF 이미지를 확대해서 직접 읽고, OCR은 초안 생성이나 긴 문장 위치 파악을 위한 보조 수단으로만 제한적으로 사용한다.
+- OCR 결과와 원본 이미지가 다르면 반드시 원본 이미지를 우선한다.
+- OCR 결과를 그대로 붙여 넣지 말고, passage, stem, options를 모두 시각적으로 대조해서 확정한다.
+- 원본 이미지로도 확신할 수 없는 단어, 선택지, 기호는 임의 추측하지 말고 notes에 기록한다.
+
 최종 CSV 컬럼은 아래 7개만 사용한다.
 
 qrange,chapter,source_pages,passage,questions_json,underlines_json,notes
@@ -44,7 +51,7 @@ qrange,chapter,source_pages,passage,questions_json,underlines_json,notes
 - 두 개 이상의 빈칸이 있으면 본문 순서대로 각각 `______`로 둔다.
 - 선택지는 passage에 넣지 않는다.
 - 밑줄 단어는 passage 안에서는 일반 텍스트로 넣고, 별도로 `underlines_json`에 기록한다.
-- OCR 오류를 그대로 두지 말고 원본 이미지를 보고 가능한 정확히 복원한다.
+- OCR을 사용했다면 결과를 그대로 신뢰하지 말고 원본 이미지를 보고 가능한 정확히 복원한다.
 - 상단 헤더, 하단 페이지 번호, 출판사명, 장식 문구, 스캔 노이즈는 passage에 넣지 않는다.
 - 본문이 한 문장뿐이어도 passage는 비워 두면 안 된다.
 
@@ -130,7 +137,7 @@ qrange,chapter,source_pages,passage,questions_json,underlines_json,notes
 - passage가 비어 있으면 안 된다.
 - 각 문항에는 최소 2개 이상의 선택지가 있어야 하고, 원본이 4지선다면 A-D 4개가 모두 있어야 한다.
 - 원본이 5지선다면 A-E 5개가 모두 있어야 한다.
-- OCR로 `conducted`가 깨지거나 `B니t`, `yo니ng`, `vahje`처럼 한글/깨진 문자가 섞인 경우, 이미지 원본을 보고 정상 영어로 고친다.
+- OCR로 `conducted`가 깨지거나 `B니t`, `yo니ng`, `vahje`처럼 한글/깨진 문자가 섞인 경우, OCR 결과를 버리고 이미지 원본을 보고 정상 영어로 고친다.
 - 확신이 없으면 임의 추측하지 말고 notes에 기록한다.
 - `validate_csv.py`를 실행했을 때 오류가 없어야 한다.
 
