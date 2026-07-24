@@ -44,3 +44,11 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Bundled runtime fonts
+!fonts/
+fonts/*
+!fonts/Pretendard-Regular.ttf
+!fonts/Pretendard-Medium.ttf
+!fonts/Pretendard-Bold.ttf
+!fonts/LICENSE-Pretendard.txt

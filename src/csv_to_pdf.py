@@ -5,6 +5,11 @@ Generate a half-half worksheet PDF from a proofread CSV.
 Input CSV columns:
   qrange, chapter, source_pages, passage, questions_json, underlines_json, notes
 
+Optional columns:
+  section_label  Override the label drawn above the left content box. This is
+                 useful for profiles such as grammar, where one row represents
+                 one Grammar Point while qrange still tracks its questions.
+
 questions_json example:
   [{"num":"001","stem":"Which ...?","options":{"A":"...","B":"...","C":"...","D":"..."}}]
 
@@ -20,6 +25,7 @@ import csv
 import html
 import json
 import os
+import re
 import tempfile
 import zipfile
 from pathlib import Path
@@ -87,6 +93,8 @@ QRANGE_FONT_SIZE = 10.3
 QRANGE_LEADING = 12.5
 PASSAGE_FONT_SIZE = 8.95
 PASSAGE_LEADING = 12.75
+PASSAGE_ALIGNMENT = "justify"
+PASSAGE_WRAP_MODE = "paragraph"
 STEM_FONT_SIZE = 8.55
 STEM_LEADING = 11.50
 OPTION_FONT_SIZE = 8.0
@@ -153,6 +161,8 @@ LAYOUT_FIELD_GROUPS = [
             "QRANGE_LEADING",
             "PASSAGE_FONT_SIZE",
             "PASSAGE_LEADING",
+            "PASSAGE_ALIGNMENT",
+            "PASSAGE_WRAP_MODE",
             "STEM_FONT_SIZE",
             "STEM_LEADING",
             "OPTION_FONT_SIZE",
@@ -161,7 +171,7 @@ LAYOUT_FIELD_GROUPS = [
     ),
 ]
 LAYOUT_KEYS = tuple(key for _group, keys in LAYOUT_FIELD_GROUPS for key in keys)
-TEXT_LAYOUT_KEYS = {"DOCUMENT_TITLE", "CONTENT_FLOW"}
+TEXT_LAYOUT_KEYS = {"DOCUMENT_TITLE", "CONTENT_FLOW", "PASSAGE_ALIGNMENT", "PASSAGE_WRAP_MODE"}
 
 
 def current_layout() -> Dict[str, Any]:
@@ -287,6 +297,7 @@ def pstyle(name: str, font: str, size: float, leading: float, alignment=TA_LEFT,
 
 def make_styles(fonts: Tuple[str, str, str]) -> Dict[str, ParagraphStyle]:
     reg, med, bold = fonts
+    passage_alignment = TA_LEFT if str(PASSAGE_ALIGNMENT).strip().lower() == "left" else TA_JUSTIFY
     return {
         "header_left": pstyle("header_left", reg, HEADER_FONT_SIZE, HEADER_LEADING),
         "header_right": pstyle("header_right", reg, HEADER_FONT_SIZE, HEADER_LEADING, alignment=TA_RIGHT),
@@ -299,7 +310,14 @@ def make_styles(fonts: Tuple[str, str, str]) -> Dict[str, ParagraphStyle]:
             textColor=colors.Color(0.86, 0.86, 0.86),
         ),
         "qrange": pstyle("qrange", bold, QRANGE_FONT_SIZE, QRANGE_LEADING),
-        "passage": pstyle("passage", med, PASSAGE_FONT_SIZE, PASSAGE_LEADING, alignment=TA_JUSTIFY, spaceAfter=0),
+        "passage": pstyle(
+            "passage",
+            med,
+            PASSAGE_FONT_SIZE,
+            PASSAGE_LEADING,
+            alignment=passage_alignment,
+            spaceAfter=0,
+        ),
         "stem": pstyle("stem", reg, STEM_FONT_SIZE, STEM_LEADING, alignment=TA_LEFT, leftIndent=STEM_INDENT, firstLineIndent=-STEM_INDENT),
         # Option block starts at the same guide line as wrapped stem lines.
         # Wrapped option lines align to the option text after the marker.
@@ -310,7 +328,7 @@ def make_styles(fonts: Tuple[str, str, str]) -> Dict[str, ParagraphStyle]:
 def esc(s: Any) -> str:
     s = "" if s is None else str(s)
     s = html.escape(s, quote=False)
-    for tag in ["u", "br"]:
+    for tag in ["u", "br", "b", "i"]:
         s = s.replace(f"&lt;{tag}&gt;", f"<{tag}>").replace(f"&lt;/{tag}&gt;", f"</{tag}>")
         s = s.replace(f"&lt;{tag}/&gt;", f"<{tag}/>")
     return s
@@ -362,6 +380,57 @@ def fit_paragraph_xml(text_xml: str, base_style: ParagraphStyle, width: float, m
         style = ParagraphStyle(style.name + "_fit", parent=base_style, fontSize=size, leading=size * leading_ratio)
         p, h = para(text_xml, style, width)
     return p, style, h
+
+
+def numbered_hanging_blocks(
+    text_xml: str,
+    base_style: ParagraphStyle,
+    width: float,
+    max_h: float,
+    min_size: float = 7.1,
+) -> Tuple[List[Tuple[Paragraph | None, float]], float]:
+    """Lay out explicit lines and apply an automatic hanging indent to numbered lines."""
+    segments = re.split(r"<br\s*/?>", text_xml, flags=re.IGNORECASE)
+    size = base_style.fontSize
+    leading_ratio = base_style.leading / max(base_style.fontSize, 0.1)
+
+    while True:
+        leading = size * leading_ratio
+        blocks: List[Tuple[Paragraph | None, float]] = []
+        total_h = 0.0
+
+        for index, segment in enumerate(segments):
+            plain = html.unescape(re.sub(r"<[^>]+>", "", segment)).strip()
+            if not plain:
+                blank_h = leading * 0.68
+                blocks.append((None, blank_h))
+                total_h += blank_h
+                continue
+
+            numbered = re.match(r"^(\d{1,3}\.)\s+", plain)
+            indent = 0.0
+            if numbered:
+                indent = pdfmetrics.stringWidth(
+                    numbered.group(1) + " ",
+                    base_style.fontName,
+                    size,
+                ) + 0.5
+
+            line_style = ParagraphStyle(
+                f"{base_style.name}_line_{index}_{size:.2f}",
+                parent=base_style,
+                fontSize=size,
+                leading=leading,
+                leftIndent=indent,
+                firstLineIndent=-indent if numbered else 0.0,
+            )
+            paragraph, height = para(segment, line_style, width)
+            blocks.append((paragraph, height))
+            total_h += height
+
+        if total_h <= max_h or size <= min_size:
+            return blocks, total_h
+        size -= 0.15
 
 
 def make_option_style(base_style: ParagraphStyle) -> ParagraphStyle:
@@ -497,18 +566,29 @@ def passage_paragraph(
     styles: Dict[str, ParagraphStyle],
     box_w: float,
     max_box_h: float | None = None,
-) -> Tuple[Paragraph, float, float, float]:
+) -> Tuple[List[Tuple[Paragraph | None, float]], float, float]:
     max_box_h = PASSAGE_BOX_MAX_H if max_box_h is None else max_box_h
     underlines = row_underlines(row)
     passage_xml = phrase_underline_xml(row.get("passage") or "", underlines)
-    p, style, h = fit_paragraph_xml(
-        passage_xml,
-        styles["passage"],
-        box_w - PASSAGE_PAD_X * 2,
-        max_box_h - PASSAGE_PAD_TOP - PASSAGE_PAD_BOTTOM,
-    )
+    text_w = box_w - PASSAGE_PAD_X * 2
+    text_max_h = max_box_h - PASSAGE_PAD_TOP - PASSAGE_PAD_BOTTOM
+    if str(PASSAGE_WRAP_MODE).strip().lower() == "numbered_hanging":
+        blocks, h = numbered_hanging_blocks(
+            passage_xml,
+            styles["passage"],
+            text_w,
+            text_max_h,
+        )
+    else:
+        p, _style, h = fit_paragraph_xml(
+            passage_xml,
+            styles["passage"],
+            text_w,
+            text_max_h,
+        )
+        blocks = [(p, h)]
     box_h = min(max_box_h, h + PASSAGE_PAD_TOP + PASSAGE_PAD_BOTTOM)
-    return p, style, h, box_h
+    return blocks, h, box_h
 
 
 def draw_passage_at(
@@ -520,14 +600,19 @@ def draw_passage_at(
     box_top: float,
     box_w: float,
 ) -> float:
-    qrange = display_qrange(row.get("qrange") or "")
-    draw_para(c, Paragraph(esc(qrange), styles["qrange"]), box_x, range_y, box_w)
+    section_label = (row.get("section_label") or "").strip()
+    label = section_label or display_qrange(row.get("qrange") or "")
+    draw_para(c, Paragraph(esc(label), styles["qrange"]), box_x, range_y, box_w)
 
-    p, _style, h, box_h = passage_paragraph(row, styles, box_w)
+    blocks, h, box_h = passage_paragraph(row, styles, box_w)
     c.setFillColor(colors.Color(0.917647, 0.917647, 0.917647))
     c.rect(box_x, box_top - box_h, box_w, box_h, stroke=0, fill=1)
     c.setFillColor(colors.black)
-    p.drawOn(c, box_x + PASSAGE_PAD_X, box_top - PASSAGE_PAD_TOP - h)
+    y = box_top - PASSAGE_PAD_TOP
+    for paragraph, block_h in blocks:
+        if paragraph is not None:
+            paragraph.drawOn(c, box_x + PASSAGE_PAD_X, y - block_h)
+        y -= block_h
     return box_top - box_h
 
 
@@ -557,7 +642,7 @@ def stacked_column_geometry(column: int) -> Tuple[float, float]:
 
 
 def stacked_item_height(row: Dict[str, str], styles: Dict[str, ParagraphStyle], box_w: float) -> float:
-    _p, _style, _text_h, box_h = passage_paragraph(row, styles, box_w)
+    _blocks, _text_h, box_h = passage_paragraph(row, styles, box_w)
     questions = row_questions(row)
     question_h = 0.0
     if questions:
