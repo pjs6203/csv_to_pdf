@@ -96,6 +96,8 @@ FIELD_LABELS = {
     "QRANGE_LEADING": "Range label leading",
     "PASSAGE_FONT_SIZE": "Passage font size",
     "PASSAGE_LEADING": "Passage leading",
+    "PASSAGE_ALIGNMENT": "Passage alignment",
+    "PASSAGE_WRAP_MODE": "Passage wrap mode",
     "STEM_FONT_SIZE": "Stem font size",
     "STEM_LEADING": "Stem leading",
     "OPTION_FONT_SIZE": "Option font size",

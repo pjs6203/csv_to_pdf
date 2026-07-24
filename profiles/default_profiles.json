@@ -6,6 +6,24 @@
         "DOCUMENT_TITLE": "Reading Worksheet"
       }
     },
+    "문법": {
+      "description": "Grammar profile based on the long-passage half-half layout. One Grammar Point per page, theory on the left and exercises on the right.",
+      "layout": {
+        "DOCUMENT_TITLE": "Grammar Worksheet",
+        "PASSAGE_ALIGNMENT": "left",
+        "PASSAGE_WRAP_MODE": "numbered_hanging",
+        "PASSAGE_FONT_SIZE": 8.65,
+        "PASSAGE_LEADING": 12.1,
+        "PASSAGE_PAD_TOP": 14.0,
+        "PASSAGE_PAD_BOTTOM": 16.0,
+        "STEM_FONT_SIZE": 8.55,
+        "STEM_LEADING": 11.5,
+        "OPTION_FONT_SIZE": 8.0,
+        "OPTION_LEADING": 10.75,
+        "STEM_OPTION_GAP": 5.0,
+        "QUESTION_BLOCK_GAP": 13.0
+      }
+    },
     "논리": {
       "description": "Short sentence-completion profile. Uses both page columns and places questions below each passage.",
       "layout": {
